@@ -1,0 +1,1321 @@
+---
+title: "Stats 133, 25 Winter -- Final"
+author: "PARSA MIRPOUR, CASSIA RAMELB, AIDAN PEREZ "
+date: "`r format(Sys.Date(), '%D')`"
+output:
+  html_document:
+    toc: yes            # creates table of contents
+    toc_depth: 4        # toc will include headers <= ####
+    toc_float: yes      # toc always on left of page
+    code_folding: show  # allows hiding of code
+---
+
+### PARSAS CODE STARTS HERE
+
+```{r}
+library(syuzhet)
+library(ggplot2)
+library(dplyr)
+library(ggplot2)
+library(SnowballC)
+library(tm)
+library(tidytext)
+library(stringr)
+```
+
+# Text Cleaning
+
+```{r}
+ai_data <- read.csv("AIdata.csv")
+colnames(ai_data) <- c("Question", "Country", "DeepSeek", "ChatGPT")
+
+deepseek_corpus <- Corpus(VectorSource(ai_data$DeepSeek))
+chatgpt_corpus  <- Corpus(VectorSource(ai_data$ChatGPT))
+
+deepseek_corpus <- tm_map(deepseek_corpus, content_transformer(tolower))
+deepseek_corpus <- tm_map(deepseek_corpus, removePunctuation)
+deepseek_corpus <- tm_map(deepseek_corpus, removeNumbers)
+deepseek_corpus <- tm_map(deepseek_corpus, removeWords, stopwords("en"))
+deepseek_corpus <- tm_map(deepseek_corpus, stripWhitespace)
+
+fix_us <- content_transformer(function(x) {
+  x <- str_replace_all(x, regex("\\b(united states|us)\\b", ignore_case = TRUE), "U.S.")
+  x <- str_replace_all(x, "lessons history tell U.S.", "lessons of history tell us")
+  return(x)
+})
+deepseek_corpus <- tm_map(deepseek_corpus, fix_us) #specific transformation
+
+deepseek_corpus <- tm_map(deepseek_corpus, stemDocument)
+
+chatgpt_corpus <- tm_map(chatgpt_corpus, content_transformer(tolower))
+chatgpt_corpus <- tm_map(chatgpt_corpus, removePunctuation)
+chatgpt_corpus <- tm_map(chatgpt_corpus, removeNumbers)
+chatgpt_corpus <- tm_map(chatgpt_corpus, removeWords, stopwords("en"))
+chatgpt_corpus <- tm_map(chatgpt_corpus, stripWhitespace)
+chatgpt_corpus <- tm_map(chatgpt_corpus, fix_us) # specific transformation
+chatgpt_corpus <- tm_map(chatgpt_corpus, stemDocument)
+
+ai_data$Clean_DeepSeek <- sapply(deepseek_corpus, as.character)
+ai_data$Clean_ChatGPT  <- sapply(chatgpt_corpus, as.character)
+
+america <- ai_data %>% filter(Country == "a")
+china   <- ai_data %>% filter(Country == "c")
+both    <- ai_data %>% filter(Country == "b")
+neither <- ai_data %>% filter(Country == "n")
+
+america_nrc_chatgpt  <- get_nrc_sentiment(america$Clean_ChatGPT)
+america_nrc_deepseek <- get_nrc_sentiment(america$Clean_DeepSeek)
+
+china_nrc_chatgpt  <- get_nrc_sentiment(china$Clean_ChatGPT)
+china_nrc_deepseek <- get_nrc_sentiment(china$Clean_DeepSeek)
+
+both_nrc_chatgpt  <- get_nrc_sentiment(both$Clean_ChatGPT)
+both_nrc_deepseek <- get_nrc_sentiment(both$Clean_DeepSeek)
+
+neither_nrc_chatgpt  <- get_nrc_sentiment(neither$Clean_ChatGPT)
+neither_nrc_deepseek <- get_nrc_sentiment(neither$Clean_DeepSeek)
+```
+
+
+# DeepSeek NRC Sentiments - America
+
+```{r}
+pie_graph <- data.frame(
+  emotion = names(sort(colSums(prop.table(america_nrc_deepseek[, 9:10])))),  
+  proportion = colSums(prop.table(america_nrc_deepseek[, 9:10])) 
+)
+
+ggplot(pie_graph, aes(x = "", y = proportion, fill = emotion)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) + 
+  ggtitle("DeepSeek NRC Positive Negative Sentiment - America") +
+  theme_minimal()
+
+nrc_others <- sort(colSums(prop.table(america_nrc_deepseek[, 1:8]))) #1:8 all sentiments except pos/neg
+
+barplot(nrc_others,
+        col = rainbow(8),
+        main = "DeepSeek NRC Sentiment - America",
+        las = 2)
+```
+
+
+# ChatGPT NRC Sentiments - America
+
+```{r}
+pie_graph <- data.frame(
+  emotion = names(sort(colSums(prop.table(america_nrc_chatgpt[, 9:10])))),
+  proportion = colSums(prop.table(america_nrc_chatgpt[, 9:10])) # Positive & Negative sentiments
+)
+
+ggplot(pie_graph, aes(x = "", y = proportion, fill = emotion)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) +
+  ggtitle("ChatGPT NRC Positive Negative Sentiment - America") +
+  theme_minimal()
+
+nrc_others <- sort(colSums(prop.table(america_nrc_chatgpt[, 1:8]))) #1:8 all sentiments except pos/neg
+
+barplot(nrc_others,
+        col = rainbow(8),
+        main = "ChatGPT NRC Sentiment - America",
+        las = 2)
+```
+
+# DeepSeek NRC Sentiments - China
+
+```{r}
+pie_graph <- data.frame(
+  emotion = names(sort(colSums(prop.table(china_nrc_deepseek[, 9:10])))),  
+  proportion = colSums(prop.table(china_nrc_deepseek[, 9:10])) 
+)
+
+ggplot(pie_graph, aes(x = "", y = proportion, fill = emotion)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) + 
+  ggtitle("DeepSeek NRC Positive Negative Sentiment - China") +
+  theme_minimal()
+
+nrc_others <- sort(colSums(prop.table(china_nrc_deepseek[, 1:8]))) #1:8 all sentiments except pos/neg
+
+barplot(nrc_others,
+        col = rainbow(8),
+        main = "DeepSeek NRC Sentiment - China",
+        las = 2)
+```
+
+# ChatGPT NRC Sentiments - China
+
+```{r}
+pie_graph <- data.frame(
+  emotion = names(sort(colSums(prop.table(china_nrc_chatgpt[, 9:10])))),  
+  proportion = colSums(prop.table(china_nrc_chatgpt[, 9:10])) 
+)
+
+ggplot(pie_graph, aes(x = "", y = proportion, fill = emotion)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) + 
+  ggtitle("ChatGPT NRC Positive Negative Sentiment - China") +
+  theme_minimal()
+
+nrc_others <- sort(colSums(prop.table(china_nrc_chatgpt[, 1:8]))) #1:8 all sentiments except pos/neg
+
+barplot(nrc_others,
+        col = rainbow(8),
+        main = "ChatGPT NRC Sentiment - China",
+        las = 2)
+```
+
+# DeepSeek Both NRC Sentiments
+
+```{r}
+pie_graph <- data.frame(
+  emotion = names(sort(colSums(prop.table(both_nrc_deepseek[, 9:10])))),  
+  proportion = colSums(prop.table(both_nrc_deepseek[, 9:10]))
+)
+
+ggplot(pie_graph, aes(x = "", y = proportion, fill = emotion)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) + 
+  ggtitle("DeepSeek NRC Positive Negative Sentiment - Both") + 
+  theme_minimal()
+
+nrc_others <- sort(colSums(prop.table(both_nrc_deepseek[, 1:8]))) #1:8 all sentiments except pos/neg
+
+barplot(nrc_others,
+        col = rainbow(8),
+        main = "DeepSeek NRC Sentiment - Both",
+        las = 2)
+```
+
+# ChatGPT Both NRC Sentiments
+
+```{r}
+pie_graph <- data.frame(
+  emotion = names(sort(colSums(prop.table(both_nrc_chatgpt[, 9:10])))),  
+  proportion = colSums(prop.table(both_nrc_chatgpt[, 9:10])) 
+)
+
+ggplot(pie_graph, aes(x = "", y = proportion, fill = emotion)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) + 
+  ggtitle("ChatGPT NRC Positive Negative Sentiment - Both") +
+  theme_minimal()
+
+nrc_others <- sort(colSums(prop.table(both_nrc_chatgpt[, 1:8]))) #1:8 all sentiments except pos/neg
+
+barplot(nrc_others,
+        col = rainbow(8),
+        main = "ChatGPT NRC Sentiment - Both",
+        las = 2)
+```
+
+# DeepSeek Neither NRC Sentiments
+
+```{r}
+pie_graph <- data.frame(
+  emotion = names(sort(colSums(prop.table(neither_nrc_deepseek[, 9:10])))),  
+  proportion = colSums(prop.table(neither_nrc_deepseek[, 9:10])) 
+)
+
+ggplot(pie_graph, aes(x = "", y = proportion, fill = emotion)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) + 
+  ggtitle("DeepSeek NRC Positive Negative Sentiment - Neither") +
+  theme_minimal()
+
+nrc_others <- sort(colSums(prop.table(neither_nrc_deepseek[, 1:8]))) #1:8 all sentiments except pos/neg
+
+barplot(nrc_others,
+        col = rainbow(8),
+        main = "DeepSeek NRC Sentiment - Neither",
+        las = 2)
+```
+
+# ChatGPT Neither NRC Sentiments
+
+```{r}
+pie_graph <- data.frame(
+  emotion = names(sort(colSums(prop.table(neither_nrc_chatgpt[, 9:10])))),  
+  proportion = colSums(prop.table(neither_nrc_chatgpt[, 9:10])) 
+)
+
+ggplot(pie_graph, aes(x = "", y = proportion, fill = emotion)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) + 
+  ggtitle("ChatGPT NRC Positive Negative Sentiment - Neither") +
+  theme_minimal()
+
+nrc_others <- sort(colSums(prop.table(neither_nrc_chatgpt[, 1:8]))) #1:8 all sentiments except pos/neg
+
+barplot(nrc_others,
+        col = rainbow(8),
+        main = "ChatGPT NRC Sentiment - Neither",
+        las = 2)
+```
+
+
+# Bing Sentiments
+
+## America
+
+```{r}
+bing_sentiments <- get_sentiments("bing")
+
+america_bing_deepseek <- america %>%
+  unnest_tokens(word, Clean_DeepSeek) %>%
+  inner_join(bing_sentiments) %>%
+  count(sentiment)
+
+
+pie_graph <- data.frame(
+  emotion = america_bing_deepseek$sentiment,  
+  proportion = america_bing_deepseek$n
+)
+
+ggplot(pie_graph, aes(x = "", y = proportion, fill = emotion)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) +
+  ggtitle("Bing Sentiment - DeepSeek (America)") +
+  theme_minimal()
+
+```
+
+```{r}
+america_bing_chatgpt <- america %>%
+  unnest_tokens(word, Clean_ChatGPT) %>%
+  inner_join(bing_sentiments) %>%
+  count(sentiment)
+
+pie_graph <- data.frame(
+  emotion = america_bing_chatgpt$sentiment,  
+  proportion = america_bing_chatgpt$n
+)
+
+ggplot(pie_graph, aes(x = "", y = proportion, fill = emotion)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) +
+  ggtitle("Bing Sentiment - ChatGPT (America)") +
+  theme_minimal()
+```
+
+## China
+
+```{r}
+china_bing_chatgpt <- china %>%
+  unnest_tokens(word, Clean_ChatGPT) %>%
+  inner_join(bing_sentiments) %>%
+  count(sentiment)
+
+china_bing_deepseek <- china %>%
+  unnest_tokens(word, Clean_DeepSeek) %>%
+  inner_join(bing_sentiments) %>%
+  count(sentiment)
+
+
+pie_graph <- data.frame(
+  emotion = china_bing_deepseek$sentiment,  
+  proportion = china_bing_deepseek$n
+)
+
+ggplot(pie_graph, aes(x = "", y = proportion, fill = emotion)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) +
+  ggtitle("Bing Sentiment - DeepSeek (China)") +
+  theme_minimal()
+```
+
+```{r}
+pie_graph <- data.frame(
+  emotion = china_bing_chatgpt$sentiment,  
+  proportion = china_bing_chatgpt$n
+)
+
+ggplot(pie_graph, aes(x = "", y = proportion, fill = emotion)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) +
+  ggtitle("Bing Sentiment - ChatGPT (China)") +
+  theme_minimal()
+```
+
+
+
+
+
+```{r}
+library(stringr)
+library(tidyr)
+library(widyr)
+
+length_data <- ai_data %>%
+  select(Country, Clean_ChatGPT, Clean_DeepSeek) %>%
+  mutate(
+    ChatGPT_Length = sapply(strsplit(Clean_ChatGPT, "\\s+"), length),
+    DeepSeek_Length = sapply(strsplit(Clean_DeepSeek, "\\s+"), length)
+  ) %>%
+  pivot_longer(cols = ends_with("_Length"), names_to = "Model", values_to = "Length") %>%
+  mutate(Model = ifelse(Model == "ChatGPT_Length", "ChatGPT", "DeepSeek"),
+         Country = recode(Country,
+                          a = "America",
+                          c = "China",
+                          b = "Both",
+                          n = "Neither"))
+
+custom_colors <- c("ChatGPT" = "#0fa27f",   
+                   "DeepSeek" = "#3c78d8")
+
+
+```
+
+
+```{r}
+# Function to create boxplot for each country
+create_boxplot <- function(country_name) {
+  ggplot(filter(length_data, Country == country_name), aes(x = Model, y = Length, fill = Model)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.7, width = 0.6) +
+    #geom_jitter(position = position_jitter(width = 0.15), size = 1, alpha = 0.5) +
+    labs(title = paste("Word Count Comparison Boxplot (", country_name, ")", sep = ""),
+         y = "Word Count") +
+    scale_fill_manual(values = custom_colors) +
+    theme_minimal() +
+    theme(legend.position = "none")
+}
+
+
+plot_america <- create_boxplot("America")
+plot_china <- create_boxplot("China")
+plot_both <- create_boxplot("Both")
+plot_neither <- create_boxplot("Neither")
+
+```
+
+```{r}
+plot_america
+plot_china
+plot_both
+plot_neither
+```
+
+
+
+
+
+
+```{r}
+# Aggregate data for overall comparison
+overall_length_data <- length_data %>%
+  group_by(Model) %>%
+  summarise(Length = list(Length)) %>%
+  unnest(cols = Length)
+
+plot_overall <- ggplot(overall_length_data, aes(x = Model, y = Length, fill = Model)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7, width = 0.6) +
+  #geom_jitter(position = position_jitter(width = 0.15), size = 1, alpha = 0.5) +
+  labs(title = "Overall Response Length Comparison",
+       x = "Model",
+       y = "Word Count") +
+  scale_fill_manual(values = custom_colors) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+plot_overall
+```
+
+
+
+##### PARSAS CODE ENDS HERE
+
+
+
+
+
+
+### AIDANS CODE STARTS HERE
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(readr)
+library(stringr)
+library(tm) 
+library(quanteda) 
+library(ggplot2) 
+library(SnowballC) 
+library(tidytext)
+
+```
+
+
+```{r}
+# Read the data
+data <- read.csv("AIdata.csv", stringsAsFactors = FALSE)
+
+
+# Finding if the word "us" is used anywhere
+
+# Define a regex pattern to match "us" but exclude "U.S." and words containing "us"
+us_pattern <- "(?<!\\w)([Uu]s)(?=[\\s.,!?;:]|$)"
+
+# Find rows where "us" appears in DeepSeek or ChatGPT
+us_rows <- data %>%
+  filter(str_detect(DeepSeek, us_pattern) | str_detect(ChatGPT, us_pattern))
+us_rows
+  
+
+# Preprocess text function
+
+clean_text <- function(text) {
+
+  # Standard cleaning
+  text <- tolower(text)
+  text <- removePunctuation(text)
+  text <- removeNumbers(text)
+  text <- removeWords(text, stopwords("english"))
+  text <- stripWhitespace(text)
+  
+  # Normalize references to the U.S.
+  text <- str_replace_all(text, regex("\\b(united states|us|u.s)\\b", ignore_case = TRUE), "U.S.")
+  # Manually fix the one real instance of "us" after cleaning
+  text <- str_replace_all(text, "lessons history tell U.S.", "lessons of history tell us")
+  
+  text <- stemDocument(text)  # Perform stemming
+  return(text)
+}
+
+
+
+# Create datasets
+chatgpt_a <- data %>% filter(`Country..c.a.b.n.` == 'a') %>% select(ChatGPT)
+chatgpt_b <- data %>% filter(`Country..c.a.b.n.` == 'b') %>% select(ChatGPT)
+chatgpt_c <- data %>% filter(`Country..c.a.b.n.` == 'c') %>% select(ChatGPT)
+chatgpt_n <- data %>% filter(`Country..c.a.b.n.` == 'n') %>% select(ChatGPT)
+chatgpt_all <- data %>% select(ChatGPT)
+
+deepseek_a <- data %>% filter(`Country..c.a.b.n.` == 'a') %>% select(DeepSeek)
+deepseek_b <- data %>% filter(`Country..c.a.b.n.` == 'b') %>% select(DeepSeek)
+deepseek_c <- data %>% filter(`Country..c.a.b.n.` == 'c') %>% select(DeepSeek)
+deepseek_n <- data %>% filter(`Country..c.a.b.n.` == 'n') %>% select(DeepSeek)
+deepseek_all <- data %>% select(DeepSeek)
+
+#Clean Datasets
+
+clean_chatgpt_a <- chatgpt_a %>% mutate(ChatGPT = sapply(ChatGPT, clean_text)) %>% select(ChatGPT)
+clean_chatgpt_b <- chatgpt_b %>% mutate(ChatGPT = sapply(ChatGPT, clean_text)) %>% select(ChatGPT)
+clean_chatgpt_c <- chatgpt_c %>% mutate(ChatGPT = sapply(ChatGPT, clean_text)) %>% select(ChatGPT)
+clean_chatgpt_n <- chatgpt_n %>% mutate(ChatGPT = sapply(ChatGPT, clean_text)) %>% select(ChatGPT)
+clean_chatgpt_all <- chatgpt_all %>% mutate(ChatGPT = sapply(ChatGPT, clean_text)) %>% select(ChatGPT)
+
+clean_deepseek_a <- deepseek_a %>% mutate(DeepSeek = sapply(DeepSeek, clean_text)) %>% select(DeepSeek)
+clean_deepseek_b <- deepseek_b %>% mutate(DeepSeek = sapply(DeepSeek, clean_text)) %>% select(DeepSeek)
+clean_deepseek_c <- deepseek_c %>% mutate(DeepSeek = sapply(DeepSeek, clean_text)) %>% select(DeepSeek)
+clean_deepseek_n <- deepseek_n %>% mutate(DeepSeek = sapply(DeepSeek, clean_text)) %>% select(DeepSeek)
+clean_deepseek_all <- deepseek_all %>% mutate(DeepSeek = sapply(DeepSeek, clean_text)) %>% select(DeepSeek)
+
+```
+
+# TF
+
+```{r}
+library(dplyr)
+library(tidytext)
+
+# Helper function to compute and rank term frequency
+ranked_tf <- function(df, colname) {
+  df %>%
+    unnest_tokens(word, !!sym(colname)) %>%
+    count(word, sort = TRUE) %>%
+    mutate(rank = row_number())
+}
+
+# Helper comparison function
+compare_tf <- function(tf_model1, tf_model2) {
+  top_20 <- tf_model1 %>% slice_head(n = 50) %>% select(word, model1_rank = rank)
+  top_1000 <- tf_model2 %>% slice_head(n = 1000) %>% select(word, model2_rank = rank)
+
+  top_20 %>%
+    left_join(top_1000, by = "word") %>%
+    mutate(model2_rank = ifelse(is.na(model2_rank), 0, model2_rank)) %>%
+    filter(model2_rank >= 51 | model2_rank == 0)
+}
+
+
+
+
+
+# Calculate term frequencies for ChatGPT
+tf_chatgpt_all <- ranked_tf(clean_chatgpt_all, "ChatGPT")
+tf_chatgpt_a    <- ranked_tf(clean_chatgpt_a, "ChatGPT")
+tf_chatgpt_b    <- ranked_tf(clean_chatgpt_b, "ChatGPT")
+tf_chatgpt_c    <- ranked_tf(clean_chatgpt_c, "ChatGPT")
+tf_chatgpt_n    <- ranked_tf(clean_chatgpt_n, "ChatGPT")
+
+# Calculate term frequencies for DeepSeek
+tf_deepseek_all <- ranked_tf(clean_deepseek_all, "DeepSeek")
+tf_deepseek_a   <- ranked_tf(clean_deepseek_a, "DeepSeek")
+tf_deepseek_b   <- ranked_tf(clean_deepseek_b, "DeepSeek")
+tf_deepseek_c   <- ranked_tf(clean_deepseek_c, "DeepSeek")
+tf_deepseek_n   <- ranked_tf(clean_deepseek_n, "DeepSeek")
+
+
+
+compare_tf_chat_all <- compare_tf(tf_chatgpt_all, tf_deepseek_all)
+compare_tf_chat_a    <- compare_tf(tf_chatgpt_a, tf_deepseek_a)
+compare_tf_chat_b    <- compare_tf(tf_chatgpt_b, tf_deepseek_b)
+compare_tf_chat_c    <- compare_tf(tf_chatgpt_c, tf_deepseek_c)
+compare_tf_chat_n    <- compare_tf(tf_chatgpt_n, tf_deepseek_n)
+
+compare_tf_deep_all <- compare_tf(tf_deepseek_all, tf_chatgpt_all)
+compare_tf_deep_a    <- compare_tf(tf_deepseek_a, tf_chatgpt_a)
+compare_tf_deep_b    <- compare_tf(tf_deepseek_b, tf_chatgpt_b)
+compare_tf_deep_c    <- compare_tf(tf_deepseek_c, tf_chatgpt_c)
+compare_tf_deep_n    <- compare_tf(tf_deepseek_n, tf_chatgpt_n)
+
+
+#### print final Chat 
+
+library(knitr)
+library(kableExtra)
+library(dplyr)
+
+# Step 1: Select specific rows by index
+
+# NOTE: some of the words were edited out (like earlier, impact, led, region) that 
+# arent relevant to results are excluded. Since the tables are already long, we did
+# not want readers to get lost in the words that did not matter, especially since
+# we would not mention them in the analysis.
+
+custom_subset <- compare_tf_chat_c %>%
+  slice(c(4, 6, 8, 9, 10, 11, 15, 16, 19))
+
+# Step 2: Rename columns
+colnames(custom_subset) <- c("Word", "ChatGPT Rank", "Deep Rank")
+
+# Step 3: Print nicely
+kable(custom_subset,
+      caption = "Selected Term Frequency Comparison — ChatGPT vs DeepSeek (Chinese Topics)",
+      col.names = c("Word", "ChatGPT Rank", "Deep Rank")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+### print final deepseek 
+  
+
+# Step 1: Select specific rows by index
+custom_deep_subset <- compare_tf_deep_c %>%
+  slice(c(1, 3, 4, 5, 7, 8, 9, 10, 11, 12, 14, 15, 18, 17))
+
+# Step 2: Rename columns
+colnames(custom_deep_subset) <- c("Word", "Deep Rank", "ChatGPT Rank")
+
+# Step 3: Print nicely
+kable(custom_deep_subset,
+      caption = "Selected Term Frequency Comparison — DeepSeek vs ChatGPT (Chinese Topics)",
+      col.names = c("Word", "Deep Rank", "ChatGPT Rank")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+
+
+### unstemmed versions
+
+# Load necessary library
+library(knitr)
+
+# Create the first dataset
+data1 <- data.frame(
+  Word = c("peace", "people", "Africa", "promote", "BRIC", "contribute", 
+           "cooperation", "establish", "leadership", "socialist", 
+           "commit", "goal", "sustain", "stability"),
+  `DeepSeek Rank` = c(9, 14, 15, 20, 28, 29, 31, 33, 34, 36, 39, 41, 47, 46),
+  `ChatGPT Rank` = c(277, 151, 82, 89, 95, 108, 164, 60, 429, 288, 504, 328, 182, 181)
+)
+
+# Create the second dataset
+data2 <- data.frame(
+  Word = c("Taiwan", "control", "trade", "U.S.", "impact", 
+           "ideology", "Soviet", "force", "Vietnam"),
+  `ChatGPT Rank` = c(12, 16, 20, 25, 28, 30, 38, 46, 49),
+  `DeepSeek Rank` = c(309, 102, 137, 215, 196, 391, 900, 254, 0)
+)
+
+library(knitr)
+library(kableExtra)
+
+# DeepSeek table
+kable(data1, caption = "<div style='text-align:center; color:black;'><b>Figure 2: DeepSeek Top 50 Term Comparison</b></div>", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+# ChatGPT table
+kable(data2, caption = "<div style='text-align:center; color:black;'><b>Figure 1: ChatGPT Top 50 Term Frequency Comparison</b></div>", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+
+
+
+```
+
+
+# TF-IDF
+
+```{r}
+library(dplyr)
+library(tidytext)
+
+# TF-IDF for ChatGPT with average tf-idf per word
+tfidf_chatgpt <- function(df, topic) {
+  df %>%
+    mutate(doc = row_number()) %>%
+    unnest_tokens(word, ChatGPT) %>%
+    count(doc, word, sort = TRUE) %>%
+    bind_tf_idf(word, doc, n) %>%
+    group_by(word) %>%
+    summarise(avg_tf_idf = mean(tf_idf), .groups = "drop") %>%
+    arrange(desc(avg_tf_idf)) %>%
+    mutate(rank = row_number())
+}
+
+# TF-IDF for DeepSeek with average tf-idf per word
+tfidf_deepseek <- function(df, topic) {
+  df %>%
+    mutate(doc = row_number()) %>%
+    unnest_tokens(word, DeepSeek) %>%
+    count(doc, word, sort = TRUE) %>%
+    bind_tf_idf(word, doc, n) %>%
+    group_by(word) %>%
+    summarise(avg_tf_idf = mean(tf_idf), .groups = "drop") %>%
+    arrange(desc(avg_tf_idf)) %>%
+    mutate(rank = row_number())
+}
+
+# Helper comparison function: top 20 model1 vs top 1000 model2
+compare_tfidf <- function(top_model1, top_model2, model1_name = "ChatGPT", model2_name = "DeepSeek") {
+  top_20 <- top_model1 %>% slice_head(n = 20) %>% select(word, model1_rank = rank)
+  top_1000 <- top_model2 %>% slice_head(n = 1000) %>% select(word, model2_rank = rank)
+
+  top_20 %>%
+    left_join(top_1000, by = "word") %>%
+    mutate(model2_rank = ifelse(is.na(model2_rank), 0, model2_rank)) %>%
+    filter(model2_rank >= 21 | model2_rank == 0)
+}
+
+# --- Calculate TF-IDF for all topics ---
+
+# ChatGPT TF-IDF
+tfidf_chatgpt_all <- tfidf_chatgpt(clean_chatgpt_all, "all")
+tfidf_chatgpt_a    <- tfidf_chatgpt(clean_chatgpt_a, "a")
+tfidf_chatgpt_b    <- tfidf_chatgpt(clean_chatgpt_b, "b")
+tfidf_chatgpt_c    <- tfidf_chatgpt(clean_chatgpt_c, "c")
+tfidf_chatgpt_n    <- tfidf_chatgpt(clean_chatgpt_n, "n")
+
+# DeepSeek TF-IDF
+tfidf_deepseek_all <- tfidf_deepseek(clean_deepseek_all, "all")
+tfidf_deepseek_a   <- tfidf_deepseek(clean_deepseek_a, "a")
+tfidf_deepseek_b   <- tfidf_deepseek(clean_deepseek_b, "b")
+tfidf_deepseek_c   <- tfidf_deepseek(clean_deepseek_c, "c")
+tfidf_deepseek_n   <- tfidf_deepseek(clean_deepseek_n, "n")
+
+# --- Compare Top 20 vs Top 1000 ---
+
+# ChatGPT vs DeepSeek
+compare_tfidf_chat_all <- compare_tfidf(tfidf_chatgpt_all, tfidf_deepseek_all)
+compare_tfidf_chat_a    <- compare_tfidf(tfidf_chatgpt_a, tfidf_deepseek_a)
+compare_tfidf_chat_b    <- compare_tfidf(tfidf_chatgpt_b, tfidf_deepseek_b) # used
+compare_tfidf_chat_c    <- compare_tfidf(tfidf_chatgpt_c, tfidf_deepseek_c) # used
+compare_tfidf_chat_n    <- compare_tfidf(tfidf_chatgpt_n, tfidf_deepseek_n)
+
+# DeepSeek vs ChatGPT
+compare_tfidf_deep_all <- compare_tfidf(tfidf_deepseek_all, tfidf_chatgpt_all, "DeepSeek", "ChatGPT")
+compare_tfidf_deep_a    <- compare_tfidf(tfidf_deepseek_a, tfidf_chatgpt_a, "DeepSeek", "ChatGPT")
+compare_tfidf_deep_b    <- compare_tfidf(tfidf_deepseek_b, tfidf_chatgpt_b, "DeepSeek", "ChatGPT")
+compare_tfidf_deep_c    <- compare_tfidf(tfidf_deepseek_c, tfidf_chatgpt_c, "DeepSeek", "ChatGPT") # used
+compare_tfidf_deep_n    <- compare_tfidf(tfidf_deepseek_n, tfidf_chatgpt_n, "DeepSeek", "ChatGPT") 
+
+
+
+# Create final_tfidf_chat_b (Figure 1)
+final_tfidf_chat_b <- data.frame(
+  Word = c("Tibet", "rebellion", "UNSC", "boxer", 
+           "dalai", "lama", "GATT", "bind", "handover", "Iraq"),
+  ChatGPT.Rank = c(1, 3, 6, 8, 12, 13, 14, 15, 16, 18),
+  Deep.Rank = c(0, 30, 0, 29, 0, 0, 335, 45, 91, 375)
+)
+
+# Create final_tfidf_chat_c (Figure 2)
+final_tfidf_chat_c <- data.frame(
+  word = c("khmer", "Rough", "camp", "lockdown", 
+           "landlord", "Vietnam", "disease", "north"),
+  ChatGPT.Rank = c(1, 4, 10, 14, 15, 16, 17, 19),
+  Deep.Rank = c(51, 52, 0, 0, 0, 0, 184, 65)
+)
+
+# Create final_tfidf_deep_c (Figure 3)
+final_tfidf_deep_c <- data.frame(
+  word = c("land", "uprising", "Yihetuan", "Cambodian", "train", 
+           "vocation", "campaign", "peasant", "online", "Japan", "nonaligned"),
+  Deep.Rank = c(2, 6, 7, 8, 9, 10, 12, 13, 15, 18, 20),
+  ChatGPT.Rank = c(127, 172, 0, 133, 0, 510, 810, 46, 261, 99, 170)
+)
+
+# Create these variables that have the contents of this table with the un-stemmed words
+
+# Printing nicely
+
+# Figure for compare_tfidf_chat_b
+kable(final_tfidf_chat_b,
+       caption = "<div style='text-align:center; color:black;'><b>Figure 1: ChatGPT Top 20 TF-IDF Comparison (Both Topics)</b></div>",
+       escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+# Figure for compare_tfidf_chat_c
+kable(final_tfidf_chat_c,
+       caption = "<div style='text-align:center; color:black;'><b>Figure 2: ChatGPT Top 20 TF-IDF Comparison (China Topics)</b></div>",
+       escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+# Figure for compare_tfidf_deep_c
+kable(final_tfidf_deep_c,
+       caption = "<div style='text-align:center; color:black;'><b>Figure 3: DeepSeek Top 20 TF-IDF Comparison (China Topics)</b></div>",
+       escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+
+
+
+```
+
+
+
+# Bigrams
+
+```{r}
+
+  
+library(tidyverse)
+library(tidytext)
+library(knitr)
+library(kableExtra)
+
+# Function for N-gram analysis
+ngram_analysisC <- function(dataset, n) {
+  dataset %>%
+    unnest_tokens(ngram, ChatGPT, token = "ngrams", n = n) %>%
+    count(ngram, sort = TRUE)
+}
+
+# Function for N-gram analysis
+ngram_analysisD <- function(dataset, n) {
+  dataset %>%
+    unnest_tokens(ngram, DeepSeek, token = "ngrams", n = n) %>%
+    count(ngram, sort = TRUE)
+}
+
+# Perform N-gram analysis for bigrams and trigrams on all datasets
+bigrams_chatgpt_a <- ngram_analysisC(clean_chatgpt_a, 2)
+bigrams_chatgpt_b <- ngram_analysisC(clean_chatgpt_b, 2)
+bigrams_chatgpt_c <- ngram_analysisC(clean_chatgpt_c, 2)
+bigrams_chatgpt_n <- ngram_analysisC(clean_chatgpt_n, 2)
+bigrams_chatgpt_all <- ngram_analysisC(clean_chatgpt_all, 2)
+
+bigrams_deepseek_a <- ngram_analysisD(clean_deepseek_a, 2)
+bigrams_deepseek_b <- ngram_analysisD(clean_deepseek_b, 2)
+bigrams_deepseek_c <- ngram_analysisD(clean_deepseek_c, 2)
+bigrams_deepseek_n <- ngram_analysisD(clean_deepseek_n, 2)
+bigrams_deepseek_all <- ngram_analysisD(clean_deepseek_all, 2)
+
+
+### Bigrams
+
+
+## chat
+
+
+# _all comparisons for chat
+
+# Extract the top 20 bigrams from ChatGPT
+top_20_chatgpt_all <- bigrams_chatgpt_all %>% slice_head(n = 20) %>% mutate(ChatGPT_Rank = row_number())
+
+# Extract the top 1000 bigrams from DeepSeek
+top_1000_deepseek_all <- bigrams_deepseek_all %>% slice_head(n = 1000)
+
+# Compare and get rankings
+compare_bigrams_chatgpt_all <- top_20_chatgpt_all %>%
+  left_join(top_1000_deepseek_all %>% mutate(DeepSeek_Rank = row_number()), by = "ngram") %>%
+  select(ngram, ChatGPT_Rank, DeepSeek_Rank) %>%
+  mutate(DeepSeek_Rank = ifelse(is.na(DeepSeek_Rank), 0, DeepSeek_Rank))  # Set to 0 if not in top 200
+
+# Final Table
+compare_bigrams_chatgpt_all %>%
+  filter(DeepSeek_Rank >= 21)  # North Korea, khmer rouge, Honk Kong
+
+
+# American topics comparisons for chat
+
+# Extract the top 20 bigrams from ChatGPT (American topics)
+top_20_chatgpt_a <- bigrams_chatgpt_a %>%
+  slice_head(n = 20) %>%
+  mutate(ChatGPT_Rank = row_number())
+
+# Extract the top 1000 bigrams from DeepSeek (American topics)
+top_1000_deepseek_a <- bigrams_deepseek_a %>%
+  slice_head(n = 1000)
+
+# Compare and get rankings
+compare_bigrams_chatgpt_a <- top_20_chatgpt_a %>%
+  left_join(top_1000_deepseek_a %>% mutate(DeepSeek_Rank = row_number()), by = "ngram") %>%
+  select(ngram, ChatGPT_Rank, DeepSeek_Rank) %>%
+  mutate(DeepSeek_Rank = ifelse(is.na(DeepSeek_Rank), 0, DeepSeek_Rank))  # Set to 0 if not in top 200
+
+# Final Table
+compare_bigrams_chatgpt_a %>%
+  filter(DeepSeek_Rank >= 21 | DeepSeek_Rank == 0) #arab state and civil war (ignore)
+
+
+# Chinese topics for chat
+
+# Extract the top 20 bigrams from ChatGPT (Chinese topics)
+top_20_chatgpt_c <- bigrams_chatgpt_c %>%
+  slice_head(n = 20) %>%
+  mutate(ChatGPT_Rank = row_number())
+
+# Extract the top 1000 bigrams from DeepSeek (Chinese topics)
+top_1000_deepseek_c <- bigrams_deepseek_c %>%
+  slice_head(n = 1000)
+
+# Compare and get rankings
+compare_bigrams_chatgpt_c <- top_20_chatgpt_c %>%
+  left_join(top_1000_deepseek_c %>% mutate(DeepSeek_Rank = row_number()), by = "ngram") %>%
+  select(ngram, ChatGPT_Rank, DeepSeek_Rank) %>%
+  mutate(DeepSeek_Rank = ifelse(is.na(DeepSeek_Rank), 0, DeepSeek_Rank))  # Set to 0 if not in top 200
+
+# Final Table
+compare_bigrams_chatgpt_c %>%
+  filter(DeepSeek_Rank >= 21 | DeepSeek_Rank == 0) ##### definitely use, remove 13th row
+
+#####to print
+
+data_bigrams_chatgpt_c <- compare_bigrams_chatgpt_c %>%
+  filter(DeepSeek_Rank >= 21 | DeepSeek_Rank == 0) %>%
+  slice(-c(12, 13)) %>%  
+  select(Bigram = ngram, Chat.Rank = ChatGPT_Rank, Deep.Rank = DeepSeek_Rank)
+
+# Print the formatted table
+kable(data_bigrams_chatgpt_c, caption = "<div style='text-align:center; color:black;'><b>Figure 1: ChatGPT Bigrams and Comparisons of China Topics</b></div>", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+
+
+
+
+
+# Both topics for chat
+
+# Extract the top 20 bigrams from ChatGPT (Both topics)
+top_20_chatgpt_b <- bigrams_chatgpt_b %>%
+  slice_head(n = 20) %>%
+  mutate(ChatGPT_Rank = row_number())
+
+# Extract the top 1000 bigrams from DeepSeek (Both topics)
+top_1000_deepseek_b <- bigrams_deepseek_b %>%
+  slice_head(n = 1000)
+
+# Compare and get rankings
+compare_bigrams_chatgpt_b <- top_20_chatgpt_b %>%
+  left_join(top_1000_deepseek_b %>% mutate(DeepSeek_Rank = row_number()), by = "ngram") %>%
+  select(ngram, ChatGPT_Rank, DeepSeek_Rank) %>%
+  mutate(DeepSeek_Rank = ifelse(is.na(DeepSeek_Rank), 0, DeepSeek_Rank))  # Set to 0 if not in top 200
+
+# Final Table
+compare_bigrams_chatgpt_b %>%
+  filter(DeepSeek_Rank >= 21 | DeepSeek_Rank == 0) # maybe use, some good stuff
+
+
+# Neither topics for chat
+
+# Extract the top 20 bigrams from ChatGPT (Neither topics)
+top_20_chatgpt_n <- bigrams_chatgpt_n %>%
+  slice_head(n = 20) %>%
+  mutate(ChatGPT_Rank = row_number())
+
+# Extract the top 1000 bigrams from DeepSeek (Neither topics)
+top_1000_deepseek_n <- bigrams_deepseek_n %>%
+  slice_head(n = 1000)
+
+# Compare and get rankings
+compare_bigrams_chatgpt_n <- top_20_chatgpt_n %>%
+  left_join(top_1000_deepseek_n %>% mutate(DeepSeek_Rank = row_number()), by = "ngram") %>%
+  select(ngram, ChatGPT_Rank, DeepSeek_Rank) %>%
+  mutate(DeepSeek_Rank = ifelse(is.na(DeepSeek_Rank), 0, DeepSeek_Rank))  # Set to 0 if not in top 200
+
+# Final Table
+compare_bigrams_chatgpt_n %>%
+  filter(DeepSeek_Rank >= 21 | DeepSeek_Rank == 0) #### communist insurgance 
+
+#print
+
+# Prepare the filtered and renamed dataset
+data_bigrams_chatgpt_n <- compare_bigrams_chatgpt_n %>%
+  filter(DeepSeek_Rank >= 21 | DeepSeek_Rank == 0) %>%
+  select(
+    Bigram = ngram,
+    Chat.Rank = ChatGPT_Rank,
+    Deep.Rank = DeepSeek_Rank
+  )
+
+# Print the nicely styled table with updated caption
+kable(data_bigrams_chatgpt_n, 
+      caption = "<div style='text-align:center; color:black;'><b>Figure 2: ChatGPT Bigrams and Comparisons of Control</b></div>", 
+      escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+
+
+
+
+
+# DeepSeek bigrams 
+
+# All topics for deepseek
+
+# Extract the top 20 bigrams from DeepSeek (All topics)
+top_20_deepseek_all <- bigrams_deepseek_all %>%
+  slice_head(n = 20) %>%
+  mutate(DeepSeek_Rank = row_number())
+
+# Extract the top 1000 bigrams from ChatGPT (All topics)
+top_1000_chatgpt_all <- bigrams_chatgpt_all %>%
+  slice_head(n = 1000)
+
+# Compare and get rankings
+compare_bigrams_deepseek_all <- top_20_deepseek_all %>%
+  left_join(top_1000_chatgpt_all %>% mutate(ChatGPT_Rank = row_number()), by = "ngram") %>%
+  select(ngram, DeepSeek_Rank, ChatGPT_Rank) %>%
+  mutate(ChatGPT_Rank = ifelse(is.na(ChatGPT_Rank), 0, ChatGPT_Rank))  # Set to 0 if not in top 1000
+
+# Final Table
+compare_bigrams_deepseek_all %>%
+  filter(ChatGPT_Rank >= 21 | ChatGPT_Rank == 0) #(not grea, dont use)
+
+
+# American topics for deepseek
+
+# Extract the top 20 bigrams from DeepSeek (American topics)
+top_20_deepseek_a <- bigrams_deepseek_a %>%
+  slice_head(n = 20) %>%
+  mutate(DeepSeek_Rank = row_number())
+
+# Extract the top 1000 bigrams from ChatGPT (American topics)
+top_1000_chatgpt_a <- bigrams_chatgpt_a %>%
+  slice_head(n = 1000)
+
+# Compare and get rankings
+compare_bigrams_deepseek_a <- top_20_deepseek_a %>%
+  left_join(top_1000_chatgpt_a %>% mutate(ChatGPT_Rank = row_number()), by = "ngram") %>%
+  select(ngram, DeepSeek_Rank, ChatGPT_Rank) %>%
+  mutate(ChatGPT_Rank = ifelse(is.na(ChatGPT_Rank), 0, ChatGPT_Rank))  # Set to 0 if not in top 1000
+
+# Final Table
+compare_bigrams_deepseek_a %>%
+  filter(ChatGPT_Rank >= 21 | ChatGPT_Rank == 0) #(not great, maybe though)
+
+
+# Both topics for deepseek
+
+# Extract the top 20 bigrams from DeepSeek (Both topics)
+top_20_deepseek_b <- bigrams_deepseek_b %>%
+  slice_head(n = 20) %>%
+  mutate(DeepSeek_Rank = row_number())
+
+# Extract the top 1000 bigrams from ChatGPT (Both topics)
+top_1000_chatgpt_b <- bigrams_chatgpt_b %>%
+  slice_head(n = 1000)
+
+# Compare and get rankings
+compare_bigrams_deepseek_b <- top_20_deepseek_b %>%
+  left_join(top_1000_chatgpt_b %>% mutate(ChatGPT_Rank = row_number()), by = "ngram") %>%
+  select(ngram, DeepSeek_Rank, ChatGPT_Rank) %>%
+  mutate(ChatGPT_Rank = ifelse(is.na(ChatGPT_Rank), 0, ChatGPT_Rank))  # Set to 0 if not in top 1000
+
+# Final Table
+compare_bigrams_deepseek_b %>%
+  filter(ChatGPT_Rank >= 21 | ChatGPT_Rank == 0) ############  Definitely Use, (Mutal respect and Kyoto protocal) talks more about peace
+
+#print
+
+# Prepare the filtered and renamed dataset
+data_bigrams_deepseek_b <- compare_bigrams_deepseek_b %>%
+  filter(ChatGPT_Rank >= 21 | ChatGPT_Rank == 0) %>%
+  select(
+    Bigram = ngram,
+    Deep.Rank = DeepSeek_Rank,
+    Chat.Rank = ChatGPT_Rank
+  )
+
+# Print the nicely styled table with updated caption
+kable(data_bigrams_deepseek_b, 
+      caption = "<div style='text-align:center; color:black;'><b>Figure 3: DeepSeek Bigrams and Comparisons of Both (Topics Regarding U.S.-China interactions)</b></div>", 
+      escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+
+
+
+
+
+# Chinese topics for deepseek
+
+# Extract the top 20 bigrams from DeepSeek (Chinese topics)
+top_20_deepseek_c <- bigrams_deepseek_c %>%
+  slice_head(n = 20) %>%
+  mutate(DeepSeek_Rank = row_number())
+
+# Extract the top 1000 bigrams from ChatGPT (Chinese topics)
+top_1000_chatgpt_c <- bigrams_chatgpt_c %>%
+  slice_head(n = 1000)
+
+# Compare and get rankings
+compare_bigrams_deepseek_c <- top_20_deepseek_c %>%
+  left_join(top_1000_chatgpt_c %>% mutate(ChatGPT_Rank = row_number()), by = "ngram") %>%
+  select(ngram, DeepSeek_Rank, ChatGPT_Rank) %>%
+  mutate(ChatGPT_Rank = ifelse(is.na(ChatGPT_Rank), 0, ChatGPT_Rank))  # Set to 0 if not in top 1000
+
+# Final Table
+compare_bigrams_deepseek_c %>%
+  filter(ChatGPT_Rank >= 21 | ChatGPT_Rank == 0) ###### amazing, must use 
+
+# print
+
+# Prepare the filtered and renamed dataset
+data_bigrams_deepseek_c <- compare_bigrams_deepseek_c %>%
+  filter(ChatGPT_Rank >= 21 | ChatGPT_Rank == 0) %>%
+  select(
+    Bigram = ngram,
+    Deep.Rank = DeepSeek_Rank,
+    Chat.Rank = ChatGPT_Rank
+  )
+
+# Print the nicely styled table with updated caption
+kable(data_bigrams_deepseek_c, 
+      caption = "<div style='text-align:center; color:black;'><b>Figure 3: DeepSeek Bigrams and Comparisons of China Topics</b></div>", 
+      escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+
+
+
+
+# Neither topics for deepseek
+
+# Extract the top 20 bigrams from DeepSeek (Neither topics)
+top_20_deepseek_n <- bigrams_deepseek_n %>%
+  slice_head(n = 20) %>%
+  mutate(DeepSeek_Rank = row_number())
+
+# Extract the top 1000 bigrams from ChatGPT (Neither topics)
+top_1000_chatgpt_n <- bigrams_chatgpt_n %>%
+  slice_head(n = 1000)
+
+# Compare and get rankings
+compare_bigrams_deepseek_n <- top_20_deepseek_n %>%
+  left_join(top_1000_chatgpt_n %>% mutate(ChatGPT_Rank = row_number()), by = "ngram") %>%
+  select(ngram, DeepSeek_Rank, ChatGPT_Rank) %>%
+  mutate(ChatGPT_Rank = ifelse(is.na(ChatGPT_Rank), 0, ChatGPT_Rank))  # Set to 0 if not in top 1000
+
+# Final Table
+compare_bigrams_deepseek_n %>%
+  filter(ChatGPT_Rank >= 21 | ChatGPT_Rank == 0) # not really a limitation, jsut say how topics are more varried, but there are no zeros in either of the neither's 
+
+
+```
+
+# Correlation (not included) 
+
+We decided not to include correlation due to not having any
+methodological approach to choosing 10 as the number to group
+our words by. Additionally, the results from correlation analysis 
+showed similar results from our bigram analysis.
+
+```{r}
+# all topics
+
+# Step 1: Add country info to cleaned datasets
+chatgpt_all_with_country <- clean_chatgpt_all %>%
+  mutate(Country = data$Country..c.a.b.n.)
+
+deepseek_all_with_country <- clean_deepseek_all %>%
+  mutate(Country = data$Country..c.a.b.n.)
+
+# Step 2: Tokenize ChatGPT into words and assign sections
+chatgpt_section_words <- chatgpt_all_with_country %>%
+  unnest_tokens(word, ChatGPT) %>%
+  filter(!word %in% stop_words$word) %>%  
+  mutate(section = row_number() %/% 10) %>%
+  select(Country, section, word)
+
+# Step 3: Tokenize DeepSeek into words and assign sections
+deepseek_section_words <- deepseek_all_with_country %>%
+  unnest_tokens(word, DeepSeek) %>%
+  filter(!word %in% stop_words$word) %>%  
+  mutate(section = row_number() %/% 10) %>%
+  select(Country, section, word)
+
+chatgpt_section_words
+deepseek_section_words
+
+# Computing correlation
+chat_word_cors<- chatgpt_section_words %>% group_by(word) %>%
+  filter(n() >= 10) %>% 
+  pairwise_cor(word, section, sort = TRUE)
+
+deep_word_cors<- deepseek_section_words %>% group_by(word) %>%
+  filter(n() >= 10) %>% 
+  pairwise_cor(word, section, sort = TRUE)
+
+chat_word_cors%>%filter(item1 == "china")
+chat_word_cors%>%filter(item1 == "u.s")
+chat_word_cors%>%filter(item1 == "communist")
+chat_word_cors%>%filter(item1 == "communism")
+
+deep_word_cors%>%filter(item1 == "china")
+deep_word_cors%>%filter(item1 == "u.s")
+deep_word_cors%>%filter(item1 == "communist")
+deep_word_cors%>%filter(item1 == "communism")
+```
+
+```{r}
+# Chinese topics
+
+# Step 2: Tokenize ChatGPT into words and assign sections
+chatgpt_section_words_c <- clean_chatgpt_c %>%
+  unnest_tokens(word, ChatGPT) %>%
+  filter(!word %in% stop_words$word) %>%  
+  mutate(section = row_number() %/% 10) %>%
+  select(section, word)
+
+# Step 3: Tokenize DeepSeek into words and assign sections
+deepseek_section_words_c <- clean_deepseek_c %>%
+  unnest_tokens(word, DeepSeek) %>%
+  filter(!word %in% stop_words$word) %>%  
+  mutate(section = row_number() %/% 10) %>%
+  select(section, word)
+
+chatgpt_section_words_c
+deepseek_section_words_c
+
+# Computing correlation
+chat_word_cors_c<- chatgpt_section_words_c %>% group_by(word) %>%
+  filter(n() >= 5) %>% 
+  pairwise_cor(word, section, sort = TRUE)
+
+deep_word_cors_c<- deepseek_section_words_c %>% group_by(word) %>%
+  filter(n() >= 5) %>% 
+  pairwise_cor(word, section, sort = TRUE)
+
+chat_word_cors_c%>%filter(item1 == "china")
+chat_word_cors_c%>%filter(item1 == "u.s")
+chat_word_cors_c%>%filter(item1 == "communist")
+chat_word_cors_c%>%filter(item1 == "communism")
+
+deep_word_cors_c%>%filter(item1 == "china")
+deep_word_cors_c%>%filter(item1 == "u.s")
+deep_word_cors_c%>%filter(item1 == "communist")
+deep_word_cors_c%>%filter(item1 == "communism")
+```
+
+```{r}
+#america topics
+
+# Step 2: Tokenize ChatGPT into words and assign sections
+chatgpt_section_words_a <- clean_chatgpt_a %>%
+  unnest_tokens(word, ChatGPT) %>%
+  filter(!word %in% stop_words$word) %>%  
+  mutate(section = row_number() %/% 10) %>%
+  select(section, word)
+
+# Step 3: Tokenize DeepSeek into words and assign sections
+deepseek_section_words_a <- clean_deepseek_a %>%
+  unnest_tokens(word, DeepSeek) %>%
+  filter(!word %in% stop_words$word) %>%  
+  mutate(section = row_number() %/% 10) %>%
+  select(section, word)
+
+chatgpt_section_words_a
+deepseek_section_words_a
+
+# Computing correlation
+chat_word_cors_a<- chatgpt_section_words_a %>% group_by(word) %>%
+  filter(n() >= 5) %>% 
+  pairwise_cor(word, section, sort = TRUE)
+
+deep_word_cors_a<- deepseek_section_words_a %>% group_by(word) %>%
+  filter(n() >= 5) %>% 
+  pairwise_cor(word, section, sort = TRUE)
+
+chat_word_cors_a%>%filter(item1 == "china")
+chat_word_cors_a%>%filter(item1 == "u.s")
+chat_word_cors_a%>%filter(item1 == "communist")
+chat_word_cors_a%>%filter(item1 == "communism")
+
+deep_word_cors_a%>%filter(item1 == "china")
+deep_word_cors_a%>%filter(item1 == "u.s")
+deep_word_cors_a%>%filter(item1 == "communist")
+deep_word_cors_a%>%filter(item1 == "communism")
+```
+
+# trigrams
+
+```{r}
+library(tidyverse)
+library(tidytext)
+library(knitr)
+library(kableExtra)
+
+# Function for N-gram analysis
+ngram_analysisC <- function(dataset, n) {
+  dataset %>%
+    unnest_tokens(ngram, ChatGPT, token = "ngrams", n = n) %>%
+    count(ngram, sort = TRUE)
+}
+
+# Function for N-gram analysis
+ngram_analysisD <- function(dataset, n) {
+  dataset %>%
+    unnest_tokens(ngram, DeepSeek, token = "ngrams", n = n) %>%
+    count(ngram, sort = TRUE)
+}
+
+trigrams_chatgpt_a <- ngram_analysisC(clean_chatgpt_a, 3)
+trigrams_chatgpt_b <- ngram_analysisC(clean_chatgpt_b, 3)
+trigrams_chatgpt_c <- ngram_analysisC(clean_chatgpt_c, 3)
+trigrams_chatgpt_n <- ngram_analysisC(clean_chatgpt_n, 3)
+trigrams_chatgpt_all <- ngram_analysisC(clean_chatgpt_all, 3)
+
+trigrams_deepseek_a <- ngram_analysisD(clean_deepseek_a, 3)
+trigrams_deepseek_b <- ngram_analysisD(clean_deepseek_b, 3)
+trigrams_deepseek_c <- ngram_analysisD(clean_deepseek_c, 3)
+trigrams_deepseek_n <- ngram_analysisD(clean_deepseek_n, 3)
+trigrams_deepseek_all <- ngram_analysisD(clean_deepseek_all, 3)
+
+
+# finding "chinese government always" in non filtered  
+
+
+# Combine original and cleaned DeepSeek responses
+deepseek_combined <- bind_cols(deepseek_all, clean_deepseek_all)
+
+chinese_government_always_rows <- deepseek_combined %>%
+  filter(str_detect(`DeepSeek...2`, "chines govern alway"))
+
+chinese_government_always_rows
+
+```
+
+### END OF AIDAN'S CODE
